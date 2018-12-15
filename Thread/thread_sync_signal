@@ -1,0 +1,118 @@
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdlib.h>
+
+void *th_first(void *arg);
+
+void *th_second(void *arg);
+
+pthread_t tid1, tid2;
+
+void handler(int signo)
+{
+    printf("In handler: tid_%s, signo=%d\n", ((pthread_self() == tid1)?"first":"second"), signo);
+}
+
+int main()
+{
+    int ret = 0;
+    //1. create first thread
+    ret = pthread_create(&tid1, NULL, (void *)*th_first, NULL);
+    if(0 !=ret)
+    {
+        perror("pthread_create");
+        exit(EXIT_FAILURE);
+    }
+    //2. create second thread
+    ret = pthread_create(&tid2, NULL, (void *)*th_second, NULL);
+    if(0 !=ret)
+    {
+        perror("pthread_create");
+        exit(EXIT_FAILURE);
+    }
+
+    sleep(2);
+    //3. send the signal of SIG_USER1 and SIG_USER2 to thread_first
+    ret = pthread_kill(tid1, SIGUSR1);
+    if(0 !=ret)
+    {
+        perror("pthread_kill");
+        exit(EXIT_FAILURE);
+    }
+
+    ret = pthread_kill(tid1, SIGUSR2);
+    if(0 !=ret)
+    {
+        perror("pthread_kill");
+        exit(EXIT_FAILURE);
+    }
+
+    //4. send the signal of SIG_USER1 and SIG_USER2 to thread_second_
+    sleep(1);
+    ret = pthread_kill(tid2, SIGUSR1);
+    if(0 !=ret)
+    {
+        perror("pthread_kill");
+        exit(EXIT_FAILURE);
+    }
+
+    ret = pthread_kill(tid2, SIGUSR2);
+    if(0 !=ret)
+    {
+        perror("pthread_kill");
+        exit(EXIT_FAILURE);
+    }
+
+    sleep(1);
+    //5. send SIGKILL to all threads
+    ret = pthread_kill(tid1, SIGKILL);
+    if(0 !=ret)
+    {
+        perror("pthread_kill");
+        exit(EXIT_FAILURE);
+    }
+
+    pthread_join(tid1, NULL);
+    pthread_join(tid2, NULL);
+
+    return 0;
+}
+
+
+void *th_first(void *arg)
+{
+    //1. Add SIGUSR1 signal
+    signal(SIGUSR1, handler);
+    
+    //2. Set the sinagl set
+    sigset_t set;
+    sigfillset(&set);                           //init set to be full, include all signal
+    sigdelset(&set, SIGUSR2);                   //delete the SIGUSR2 from the set variable
+    pthread_sigmask(SIG_SETMASK, &set, NULL);   //set the current mask set to be defined set variable
+    
+    //3. Circular wait the signal
+    int i;
+    for(i=0; i<5; i++)
+    {
+        printf("\nThis is th_first, tid=%#x\n ", pthread_self());
+        pause();
+    }
+}
+
+void *th_second(void *arg)
+{
+    usleep(100);
+    //1. Add the signal of SIGUSR2
+    signal(SIGUSR2, handler);
+
+    //2. Circular wait the signal
+    int i;
+    for(i=0; i<5; i++)
+    {
+        printf("\nThis is th_second, tid=%#x\n", pthread_self());
+        pause();
+    }
+}
