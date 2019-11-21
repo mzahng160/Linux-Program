@@ -13,7 +13,7 @@ public:
 	//BlockingQueue(BlockingQueue&) = delete;
 
 	void put(const T& x)
-	{
+	{		
 		std::lock_guard <std::mutex> lck(mutex_);
 		queue_.push_back(x);
 		notEmpty_.notify_one(); // wait morphing saves us							
@@ -28,7 +28,7 @@ public:
 
 	T take()
 	{
-		std::unique_lock<std::mutex> lck(mtx);
+		std::unique_lock<std::mutex> lck(mutex_);
 		// always use a while-loop, due to spurious wakeup
 		while (queue_.empty()) 
 			notEmpty_.wait(lck);
